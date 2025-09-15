@@ -21,7 +21,7 @@ class _HomeState extends State<Home> {
   Future<List<Map<String, dynamic>>> fetchAllProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('https://blockchain-api-pt82.onrender.com/api/products/all'),
+        Uri.parse('https://trustbazar-backend.onrender.com/api/products/all'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -58,30 +58,91 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> details(String barcode) async {
-    print("Fetching details for barcode: $barcode");
-    
+  // Future<void> details(String barcode) async {
+  //   print("Fetching details for barcode: $barcode");
+  //
+  //   try {
+  //     // First show loading screen
+  //     if (!isLoading) {
+  //       isLoading = true;
+  //       Navigator.push(context, MaterialPageRoute(builder: (_) => Loading()));
+  //     }
+  //
+  //     // Find product by barcode
+  //     final product = await findProductByBarcode(barcode);
+  //
+  //     // Hide loading screen
+  //     if (Navigator.canPop(context)) {
+  //       Navigator.pop(context);
+  //     }
+  //
+  //     if (product != null) {
+  //       final basicDetails = product["basicDetails"];
+  //       final tracking = product["tracking"];
+  //       final exp = product["expiration"];
+  //
+  //       // Show product details
+  //       Navigator.push(
+  //         context,
+  //         MaterialPageRoute(
+  //           builder: (context) => Desc(
+  //             title: basicDetails["productName"]?.toString() ?? 'Unknown',
+  //             desc: basicDetails["description"]?.toString() ?? 'No description',
+  //             brand: basicDetails["brand"]?.toString() ?? 'Unknown',
+  //             price: basicDetails["price"]?.toString() ?? '0',
+  //             weight: basicDetails["weight"]?.toString() ?? 'Unknown',
+  //             url: basicDetails["productImg"]?.toString() ?? '',
+  //             serialNo: tracking["serialNumber"]?.toString() ?? 'Unknown',
+  //             mfgDate: exp["manufacturingDate"]?.toString() ?? 'Unknown',
+  //             expDate: exp["expirationDate"]?.toString() ?? 'Unknown',
+  //             sellStatus: product["sellStatus"]?.toString() ?? 'Unknown',
+  //           ),
+  //         ),
+  //       );
+  //     } else {
+  //       // Product not found
+  //       Navigator.push(
+  //         context,
+  //         MaterialPageRoute(builder: (context) => NotFound()),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     print("Error fetching details: $e");
+  //     // Only pop if we're on the loading screen
+  //     if (Navigator.canPop(context)) {
+  //       Navigator.pop(context);
+  //     }
+  //     // Show not found page
+  //     Navigator.push(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => NotFound()),
+  //     );
+  //   } finally {
+  //     isLoading = false;
+  //   }
+  // }
+
+  Future<void> verifyProductBySerial(String serialNumber) async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
-      // First show loading screen
-      if (!isLoading) {
-        isLoading = true;
-        Navigator.push(context, MaterialPageRoute(builder: (_) => Loading()));
-      }
-      
-      // Find product by barcode
-      final product = await findProductByBarcode(barcode);
-      
-      // Hide loading screen
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      
-      if (product != null) {
-        final basicDetails = product["basicDetails"];
-        final tracking = product["tracking"];
-        final exp = product["expiration"];
-        
-        // Show product details
+      final response = await http.post(
+        Uri.parse('https://trustbazar-backend.onrender.com/api/products/verify'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'serialNumber': serialNumber}),
+      );
+
+      if (response.statusCode == 200) {
+        // Product found
+        final data = jsonDecode(response.body);
+        final basicDetails = data["basicDetails"];
+        final tracking = data["tracking"];
+        final exp = data["expiration"];
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -95,32 +156,31 @@ class _HomeState extends State<Home> {
               serialNo: tracking["serialNumber"]?.toString() ?? 'Unknown',
               mfgDate: exp["manufacturingDate"]?.toString() ?? 'Unknown',
               expDate: exp["expirationDate"]?.toString() ?? 'Unknown',
-              sellStatus: product["sellStatus"]?.toString() ?? 'Unknown',
+              sellStatus: data["sellStatus"]?.toString() ?? 'Unknown',
             ),
           ),
         );
-      } else {
+      } else if (response.statusCode == 404) {
         // Product not found
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => NotFound()),
         );
+      } else {
+        throw Exception('Failed to verify product: ${response.statusCode}');
       }
     } catch (e) {
-      print("Error fetching details: $e");
-      // Only pop if we're on the loading screen
-      if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      // Show not found page
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => NotFound()),
+      print('Error verifying product: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error verifying product: $e')),
       );
     } finally {
-      isLoading = false;
+      setState(() {
+        isLoading = false;
+      });
     }
   }
+
 
   Future<void> scanBarcode() async {
     try {
@@ -133,7 +193,7 @@ class _HomeState extends State<Home> {
         });
         
         // Fetch product details
-        await details(result.rawContent);
+        await verifyProductBySerial(result.rawContent);
       }
     } catch (e) {
       print('Error scanning barcode: $e');
@@ -148,7 +208,7 @@ class _HomeState extends State<Home> {
       setState(() {
         lastScannedBarcode = barcode;
       });
-      await details(barcode);
+      await verifyProductBySerial(barcode);
     } catch (e) {
       print('Error scanning with barcode: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +246,7 @@ class _HomeState extends State<Home> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    'All Products',
+                    'All EMON Products',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
